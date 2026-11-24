@@ -299,6 +299,7 @@ function buildDocActionButtons(d) {
     btns.push(`<button class="btn btn-sm btn-danger" data-discard="${d.id}">Descartar</button>`);
   }
   if (d.Estado === DOC_STATES.PRESENTADA && state.caps.canEditOwnQuote) {
+    btns.push(`<button class="btn btn-sm btn-success" data-to-oc="${d.id}">Pasar a Facturar</button>`);
     btns.push(`<button class="btn btn-sm btn-primary" data-send="${d.id}">Reenviar</button>`);
     btns.push(`<button class="btn btn-sm btn-danger" data-discard="${d.id}">Descartar</button>`);
   }
@@ -381,6 +382,9 @@ function bindDocActions() {
   });
   document.querySelectorAll("[data-discard]").forEach((btn) => {
     btn.onclick = () => openDiscardModal(btn.dataset.discard);
+  });
+  document.querySelectorAll("[data-to-oc]").forEach((btn) => {
+    btn.onclick = () => openToOcModal(btn.dataset.toOc);
   });
   document.querySelectorAll("[data-print-envio]").forEach((btn) => {
     btn.onclick = () => openPrintShippingModal(btn.dataset.printEnvio);
@@ -565,11 +569,21 @@ async function openDocDetailModal(docId) {
     </div>`;
 
   const footerBtns = [`<button type="button" class="btn btn-secondary" id="btnPrintDocDetail">Imprimir</button>`];
+  if (doc.Estado === DOC_STATES.PRESENTADA && state.caps.canEditOwnQuote) {
+    footerBtns.push(`<button type="button" class="btn btn-success" id="btnDetailToOc">Pasar a Facturar</button>`);
+  }
   if (doc.Estado === DOC_STATES.FACTURAR && state.caps.canInvoice) {
     footerBtns.push(`<button type="button" class="btn btn-success" id="btnDetailToInvoice">Registrar Factura</button>`);
   }
   $("docDetailFooter").innerHTML = footerBtns.join("");
   $("btnPrintDocDetail").onclick = () => window.print();
+  const toOcBtn = $("btnDetailToOc");
+  if (toOcBtn) {
+    toOcBtn.onclick = () => {
+      $("docDetailModal").classList.add("hidden");
+      openToOcModal(doc.id);
+    };
+  }
   const invBtn = $("btnDetailToInvoice");
   if (invBtn) {
     invBtn.onclick = () => {
@@ -1113,6 +1127,33 @@ async function confirmDiscard() {
   showToast("Cotización descartada con motivo guardado");
 }
 
+function openToOcModal(docId) {
+  state.toOcDocId = docId;
+  const doc = state.documentos.find((d) => String(d.id) === String(docId));
+  if (!doc) return;
+  $("toOcSubtitle").textContent = `${doc.Title || `CO-${doc.id}`} · ${doc.ClienteNombre || ""} · ${fmtQ(doc.TotalDocumento)}`;
+  $("toOcCliente").value = doc.OCCliente || "";
+  $("toOcModal").classList.remove("hidden");
+}
+
+async function confirmToOc() {
+  const doc = state.documentos.find((d) => String(d.id) === String(state.toOcDocId));
+  if (!doc) return;
+  const ocCliente = $("toOcCliente").value.trim();
+  const medio = $("toOcMedio").value;
+  const nowIso = new Date().toISOString();
+
+  doc.Estado = DOC_STATES.FACTURAR;
+  doc.Title = (doc.Title || "").replace(/^CO-/, "OC-") || `OC-${doc.CorrelativoBase || doc.id}`;
+  doc.OCCliente = ocCliente;
+  doc.MedioAprobacion = medio;
+  doc.FechaConversionOC = nowIso;
+
+  $("toOcModal").classList.add("hidden");
+  renderAll();
+  showToast(`${doc.Title} enviada a Bandeja de Facturación`);
+}
+
 function openInvoiceModal(docId) {
   state.invoicingDocId = docId;
   const doc = state.documentos.find((d) => String(d.id) === String(docId));
@@ -1415,6 +1456,8 @@ function bindEvents() {
 
   $("btnCloseInvoiceModal").onclick = () => $("invoiceModal").classList.add("hidden");
   $("btnConfirmInvoice").onclick = confirmInvoice;
+  $("btnCloseToOcModal").onclick = () => $("toOcModal").classList.add("hidden");
+  $("btnConfirmToOc").onclick = confirmToOc;
   $("btnClosePriceModal").onclick = () => $("priceModal").classList.add("hidden");
   $("btnSavePrice").onclick = savePrice;
 }

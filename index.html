@@ -363,6 +363,38 @@
     </div>
   </div>
 
+  <!-- Modal Pasar a Facturar (Vendedor / Gerencia desde Presentada) -->
+  <div id="toOcModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Enviar a Facturación (OC)</h3>
+        <button id="btnCloseToOcModal" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body form-grid">
+        <div class="field-group full">
+          <p id="toOcSubtitle" class="muted" style="margin:0;"></p>
+        </div>
+        <div class="field-group">
+          <label for="toOcMedio">Medio de aprobación</label>
+          <select id="toOcMedio">
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Correo">Correo</option>
+            <option value="OC del cliente">OC del cliente</option>
+            <option value="Llamada">Llamada</option>
+            <option value="Presencial">Presencial</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="toOcCliente">OC Cliente (opcional)</label>
+          <input id="toOcCliente" type="text" placeholder="Ej. OC-45012" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnConfirmToOc" type="button" class="btn btn-success">Confirmar y Enviar a Facturación</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal Facturar (Exclusivo Facturación) -->
   <div id="invoiceModal" class="modal-backdrop hidden">
     <div class="modal-card">
