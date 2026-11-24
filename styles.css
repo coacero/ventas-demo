@@ -61,9 +61,9 @@ body {
 .topbar h1 { margin: 0; font-size: 1.05rem; }
 .version-pill {
   font-size: 0.7rem; font-weight: 600; background: rgba(255,255,255,0.14);
-  color: #cbd5e1; padding: 0.12rem 0.45rem; border-radius: 999px;
-  margin-left: 0.35rem; vertical-align: middle;
+  color: #cbd5e1; padding: 0.16rem 0.5rem; border-radius: 999px; white-space: nowrap;
 }
+.mobile-break { display: none; }
 .brand-sub { margin: 0; font-size: 0.78rem; color: #94a3b8; }
 .topbar-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
@@ -324,13 +324,12 @@ input[type="search"], input[type="text"], input[type="email"], input[type="numbe
   .topbar h1 { font-size: 0.88rem; }
   .brand-sub { display: none; }
   .topbar-actions { display: contents; }
-  #btnAuth { order: 1; padding: 0.32rem 0.55rem; font-size: 0.75rem; white-space: nowrap; }
-  .demo-select, #btnNewQuote, #btnRefresh {
-    order: 2;
-    padding: 0.32rem 0.55rem;
-    font-size: 0.76rem;
-    white-space: nowrap;
-  }
+  #btnAuth { order: 1; padding: 0.3rem 0.55rem; font-size: 0.74rem; white-space: nowrap; flex-shrink: 0; }
+  .mobile-break { display: block; order: 2; flex-basis: 100%; height: 0; }
+  .demo-select { order: 3; flex: 1 1 130px; width: auto; padding: 0.32rem 0.45rem; font-size: 0.76rem; }
+  #btnNewQuote { order: 4; padding: 0.32rem 0.55rem; font-size: 0.75rem; white-space: nowrap; }
+  #btnRefresh { order: 5; padding: 0.32rem 0.5rem; font-size: 0.76rem; }
+  .version-pill { order: 6; }
   .role-badge { display: none; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-filters { grid-template-columns: 1fr; }
