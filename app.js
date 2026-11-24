@@ -720,29 +720,82 @@ function renderCatalogView() {
   const rows = state.productos.filter((p) =>
     [p.Title, p.CodigoInterno, p.CodigoExterno].some((v) => String(v || "").toLowerCase().includes(q))
   );
+
+  const canEdit = Boolean(state.caps.canEditPrices);
+  const inline = canEdit && Boolean(state.isEditingPricesInline);
+  $("btnTogglePriceEdit").classList.toggle("hidden", !canEdit);
+  $("btnTogglePriceEdit").textContent = inline ? "Cancelar" : "Editar Precios";
+  $("btnSaveAllPrices").classList.toggle("hidden", !inline);
+
   $("catalogTableBody").innerHTML = rows
-    .map(
-      (p) => `
+    .map((p) => {
+      const std = Number(p.PrecioReferencia || 0).toFixed(2);
+      const cred = Number(p.PrecioCredito || p.PrecioReferencia || 0).toFixed(2);
+      const min = Number(p.PrecioMinimoGerencia || 0).toFixed(2);
+      return `
       <tr>
         <td>${p.CodigoExterno || p.CodigoInterno || p.id}</td>
         <td>${
-          state.caps.canEditPrices
+          canEdit && !inline
             ? `<button type="button" class="doc-link-btn" data-edit-price="${p.id}">${p.Title}</button>`
             : p.Title
         }</td>
         <td>${p.UnidadesPorAtado || 0}</td>
-        <td class="num">${fmtQ(p.PrecioReferencia)}</td>
-        <td class="num">${fmtQ(p.PrecioCredito || p.PrecioReferencia)}</td>
-        <td class="num">${fmtQ(p.PrecioMinimoGerencia)}</td>
-      </tr>`
-    )
+        <td class="num">${
+          inline
+            ? `<input type="number" min="0.01" step="0.01" class="inline-price-input" data-inline-std="${p.id}" value="${std}" />`
+            : fmtQ(p.PrecioReferencia)
+        }</td>
+        <td class="num">${
+          inline
+            ? `<input type="number" min="0" step="0.01" class="inline-price-input" data-inline-cred="${p.id}" value="${cred}" />`
+            : fmtQ(p.PrecioCredito || p.PrecioReferencia)
+        }</td>
+        <td class="num">${
+          inline
+            ? `<input type="number" min="0" step="0.01" class="inline-price-input" data-inline-min="${p.id}" value="${min}" />`
+            : fmtQ(p.PrecioMinimoGerencia)
+        }</td>
+      </tr>`;
+    })
     .join("");
 
-  if (state.caps.canEditPrices) {
+  if (canEdit && !inline) {
     document.querySelectorAll("[data-edit-price]").forEach((btn) => {
       btn.onclick = () => openPriceModal(btn.dataset.editPrice);
     });
   }
+}
+
+async function saveAllInlinePrices() {
+  if (!state.caps.canEditPrices) return;
+  const stdInputs = Array.from(document.querySelectorAll("[data-inline-std]"));
+  const updates = [];
+  for (const inp of stdInputs) {
+    const id = inp.dataset.inlineStd;
+    const prod = state.productos.find((p) => String(p.id) === String(id));
+    if (!prod) continue;
+    const credInp = document.querySelector(`[data-inline-cred="${id}"]`);
+    const minInp = document.querySelector(`[data-inline-min="${id}"]`);
+    const res = validatePriceUpdate({
+      precioReferencia: inp.value,
+      precioCredito: credInp?.value,
+      precioMinimoGerencia: minInp?.value,
+    });
+    if (!res.ok) {
+      showToast(`${prod.Title}: ${res.error}`);
+      return;
+    }
+    updates.push({ prod, values: res.values });
+  }
+
+  for (const { prod, values } of updates) {
+    Object.assign(prod, values);
+  }
+
+  state.isEditingPricesInline = false;
+  renderCatalogView();
+  showToast("Precios actualizados en demo");
 }
 
 function openPriceModal(prodId) {
@@ -1460,6 +1513,11 @@ function bindEvents() {
   $("btnConfirmToOc").onclick = confirmToOc;
   $("btnClosePriceModal").onclick = () => $("priceModal").classList.add("hidden");
   $("btnSavePrice").onclick = savePrice;
+  $("btnTogglePriceEdit").onclick = () => {
+    state.isEditingPricesInline = !state.isEditingPricesInline;
+    renderCatalogView();
+  };
+  $("btnSaveAllPrices").onclick = saveAllInlinePrices;
 }
 
 if ("serviceWorker" in navigator) {
