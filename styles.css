@@ -58,6 +58,11 @@ body {
   display: block;
 }
 .topbar h1 { margin: 0; font-size: 1.05rem; }
+.version-pill {
+  font-size: 0.7rem; font-weight: 600; background: rgba(255,255,255,0.14);
+  color: #cbd5e1; padding: 0.12rem 0.45rem; border-radius: 999px;
+  margin-left: 0.35rem; vertical-align: middle;
+}
 .brand-sub { margin: 0; font-size: 0.78rem; color: #94a3b8; }
 .topbar-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
