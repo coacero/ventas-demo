@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COACERO · Ventas y Facturación</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="./assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./vendor/msal-browser.min.js"></script>
+</head>
+<body>
+  <div id="splashScreen" class="splash-screen">
+    <div class="splash-card">
+      <div class="splash-logo-wrap">
+        <img src="./assets/logo-coacero.png" alt="COACERO" class="splash-logo" />
+      </div>
+      <h2>Ventas y Facturación</h2>
+      <p id="splashStatus" class="splash-status">Iniciando portal comercial...</p>
+      <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="offlineBanner" class="offline-banner hidden">
+    Sin conexión a internet. Algunas acciones de SharePoint están deshabilitadas hasta recuperar red.
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-brand">
+      <img src="./assets/logo-coacero.png" alt="COACERO" class="brand-logo-img" />
+      <div>
+        <h1>COACERO · Ventas y Facturación</h1>
+        <p id="connectionSub" class="brand-sub">Conectando...</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span id="roleBadge" class="role-badge hidden">—</span>
+      <select id="demoRoleSelect" class="demo-select hidden" title="Cambiar rol en vista demo">
+        <option value="gerencia">Vista: Gerencia</option>
+        <option value="vendedor">Vista: Vendedor</option>
+        <option value="facturacion">Vista: Facturación</option>
+      </select>
+      <button id="btnNewQuote" class="btn btn-primary hidden">+ Nueva Cotización</button>
+      <button id="btnRefresh" class="btn btn-ghost hidden" title="Actualizar datos">↻</button>
+      <button id="btnAuth" class="btn btn-secondary">Iniciar sesión</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <!-- Pantalla de bienvenida / login -->
+    <section id="authGate" class="auth-gate">
+      <div class="auth-card">
+        <div class="auth-logo-wrap">
+          <img src="./assets/logo-coacero.png" alt="COACERO" class="auth-logo" />
+        </div>
+        <h2>Portal Comercial COACERO</h2>
+        <p>Gestiona cotizaciones, seguimiento de despachos y control de facturación desde PC o celular.</p>
+        <div class="auth-roles-pills">
+          <span class="badge badge-info">Vendedores</span>
+          <span class="badge badge-neutral">Gerencia</span>
+          <span class="badge badge-success">Facturación</span>
+        </div>
+        <div class="auth-buttons">
+          <button id="btnLoginGate" class="btn btn-primary">Iniciar sesión con Microsoft</button>
+          <button id="btnDemoPreview" class="btn btn-ghost">Previsualizar en modo demo</button>
+        </div>
+        <p id="authError" class="error-text hidden"></p>
+      </div>
+    </section>
+
+    <!-- Contenido principal autenticado -->
+    <section id="mainWorkspace" class="hidden">
+      <nav id="desktopTabs" class="tabs-bar"></nav>
+
+      <div id="kpiGrid" class="kpi-grid"></div>
+
+      <!-- Vista: Cotizaciones / Bandeja / Facturas -->
+      <section id="viewDocuments" class="panel">
+        <div class="toolbar">
+          <div class="search-box">
+            <input id="docSearch" type="search" placeholder="Buscar por CO-, OC-, DE-, Factura o Cliente..." />
+          </div>
+          <div id="stateChips" class="chips-row"></div>
+          <button id="btnExportDocs" class="btn btn-success hidden">Exportar Excel</button>
+        </div>
+
+        <div class="table-wrap desktop-only">
+          <table class="data-table">
+            <thead id="docsTableHead"></thead>
+            <tbody id="docsTableBody"></tbody>
+          </table>
+        </div>
+        <div id="docsMobileCards" class="cards-list mobile-only"></div>
+      </section>
+
+      <!-- Vista: Reporte por Cliente y Período -->
+      <section id="viewReport" class="panel hidden">
+        <div class="report-filters">
+          <div class="field-group">
+            <label for="repFrom">Desde</label>
+            <input id="repFrom" type="date" />
+          </div>
+          <div class="field-group">
+            <label for="repTo">Hasta</label>
+            <input id="repTo" type="date" />
+          </div>
+          <div class="field-group field-clients">
+            <label>Clientes (<span id="repClientsSummary">Todos</span>)</label>
+            <div class="client-multiselect">
+              <input id="repClientSearch" type="search" placeholder="Filtrar lista de clientes..." />
+              <div class="client-ms-actions">
+                <button id="btnRepSelectAll" type="button" class="link-btn">Todos</button>
+                <button id="btnRepClearClients" type="button" class="link-btn">Limpiar</button>
+              </div>
+              <div id="repClientChecklist" class="client-checklist"></div>
+            </div>
+          </div>
+          <div class="field-group report-cta">
+            <button id="btnExportReport" class="btn btn-success">Exportar Excel (CSV)</button>
+          </div>
+        </div>
+
+        <div id="reportSummaryBar" class="report-summary"></div>
+
+        <div class="table-wrap desktop-only">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Factura / Ref</th>
+                <th>Fecha Fact.</th>
+                <th>Cliente</th>
+                <th>Vendedor</th>
+                <th>Forma Pago</th>
+                <th>Días</th>
+                <th>Estado Pago</th>
+                <th class="num">Total (Q)</th>
+              </tr>
+            </thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+        <div id="reportMobileCards" class="cards-list mobile-only"></div>
+      </section>
+
+      <!-- Vista: Clientes -->
+      <section id="viewClients" class="panel hidden">
+        <div class="toolbar">
+          <input id="clientSearch" type="search" placeholder="Buscar cliente o NIT..." />
+          <button id="btnNewClient" class="btn btn-primary">+ Nuevo Cliente</button>
+        </div>
+        <div id="clientsList" class="cards-grid"></div>
+      </section>
+
+      <!-- Vista: Catálogo y Precios -->
+      <section id="viewCatalog" class="panel hidden">
+        <div class="toolbar">
+          <input id="catalogSearch" type="search" placeholder="Buscar producto o código..." />
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Unid/Atado</th>
+                <th class="num">Contado (Q)</th>
+                <th class="num">Crédito (Q)</th>
+                <th class="num">Mín. Gerencia (Q)</th>
+              </tr>
+            </thead>
+            <tbody id="catalogTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Navegación inferior en móvil -->
+  <nav id="mobileBottomNav" class="bottom-nav hidden"></nav>
+
+  <!-- Modal Editor Maestro-Detalle de Cotización -->
+  <div id="quoteModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3 id="quoteModalTitle">Nueva Cotización</h3>
+        <button id="btnCloseQuoteModal" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="field-group">
+            <label for="qCliente">Cliente</label>
+            <select id="qCliente"></select>
+          </div>
+          <div class="field-group">
+            <label for="qFormaPago">Forma de pago</label>
+            <select id="qFormaPago">
+              <option value="Contado">Contado</option>
+              <option value="Credito">Crédito</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="qDiasCredito">Días crédito</label>
+            <input id="qDiasCredito" type="number" min="0" value="0" />
+          </div>
+          <div class="field-group">
+            <label for="qOCCliente">OC Cliente (opcional)</label>
+            <input id="qOCCliente" type="text" placeholder="Ej. OC-45012" />
+          </div>
+          <div class="field-group full">
+            <label for="qDireccionEntrega">Dirección de entrega</label>
+            <input id="qDireccionEntrega" type="text" placeholder="Dirección exacta para Despachos" />
+          </div>
+          <div class="field-group full">
+            <label for="qObservaciones">Observaciones de entrega</label>
+            <input id="qObservaciones" type="text" placeholder="Horario, contacto en obra, acceso..." />
+          </div>
+        </div>
+
+        <div class="lines-section">
+          <div class="lines-header">
+            <h4>Materiales y cantidades</h4>
+            <div class="add-line-bar">
+              <select id="lineProductSelect"></select>
+              <button id="btnAddLine" type="button" class="btn btn-secondary">+ Agregar línea</button>
+            </div>
+          </div>
+          <div id="quoteLinesList" class="quote-lines"></div>
+          <div class="quote-totals">
+            <span id="quoteMinAlert" class="badge badge-danger hidden">Alerta: incluye precio menor al mínimo de Gerencia</span>
+            <div>
+              <strong>Total: <span id="quoteTotalDisplay">Q 0.00</span></strong>
+              <small id="quoteWeightDisplay" class="muted">0.00 qq</small>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnDiscardFromEditor" type="button" class="btn btn-danger hidden">Descartar</button>
+        <button id="btnSaveDraft" type="button" class="btn btn-secondary">Guardar Borrador</button>
+        <button id="btnEmitQuote" type="button" class="btn btn-primary">Enviar / Presentar...</button>
+        <button id="btnConvertOC" type="button" class="btn btn-success">Pasar a Facturar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Enviar / Presentar Cotización -->
+  <div id="sendQuoteModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="sendQuoteTitle">Enviar / Presentar Cotización</h3>
+        <button id="btnCloseSendModal" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="sendQuoteSubtitle" class="muted"></p>
+        <p class="muted">Elige cómo entregarla al cliente. Al completar cualquiera de estas acciones pasará a estado <strong>Presentada</strong>:</p>
+        <div class="auth-buttons">
+          <button id="btnSendEmail" type="button" class="btn btn-primary">Enviar por Correo</button>
+          <button id="btnSendWhatsApp" type="button" class="btn btn-success">Enviar por WhatsApp</button>
+          <button id="btnSendExtract" type="button" class="btn btn-secondary">Extraer / Descargar Documento</button>
+          <button id="btnSendPrint" type="button" class="btn btn-secondary">Imprimir Cotización</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Descartar Cotización -->
+  <div id="discardModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="discardModalTitle">Descartar Cotización</h3>
+        <button id="btnCloseDiscardModal" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="discardModalSubtitle" class="muted"></p>
+        <div class="field-group">
+          <label for="discardReasonInput">Motivo de descarte (obligatorio)</label>
+          <input id="discardReasonInput" type="text" placeholder="Ej. Cliente eligió otra opción / fuera de presupuesto..." />
+        </div>
+        <p id="discardError" class="error-text hidden"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="btnConfirmDiscard" type="button" class="btn btn-danger">Confirmar Descarte</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Vista Detalle (tipo documento / PDF en pantalla) -->
+  <div id="docDetailModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3 id="docDetailTitle">Detalle del Documento</h3>
+        <button id="btnCloseDocDetail" class="icon-btn" type="button">✕</button>
+      </div>
+      <div id="docDetailBody" class="modal-body"></div>
+      <div id="docDetailFooter" class="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Modal Nuevo Cliente -->
+  <div id="clientModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Nuevo Cliente</h3>
+        <button id="btnCloseClientModal" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body form-grid">
+        <div class="field-group full">
+          <label for="cNombre">Nombre fiscal (MAYÚSCULAS)</label>
+          <input id="cNombre" type="text" required />
+        </div>
+        <div class="field-group">
+          <label for="cNit">NIT</label>
+          <input id="cNit" type="text" value="CF" />
+        </div>
+        <div class="field-group">
+          <label for="cTelefono">Teléfono / Celular</label>
+          <input id="cTelefono" type="text" />
+        </div>
+        <div class="field-group full">
+          <label for="cCorreo">Correo electrónico</label>
+          <input id="cCorreo" type="email" />
+        </div>
+        <div class="field-group full">
+          <label for="cDireccion">Dirección</label>
+          <input id="cDireccion" type="text" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSaveClient" type="button" class="btn btn-primary">Guardar Cliente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar Precios (Gerencia / Facturación) -->
+  <div id="priceModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="priceModalTitle">Editar Precios</h3>
+        <button id="btnClosePriceModal" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body form-grid">
+        <div class="field-group full">
+          <label for="pEstandar">Precio Estándar / Contado (Q)</label>
+          <input id="pEstandar" type="number" min="0.01" step="0.01" />
+        </div>
+        <div class="field-group">
+          <label for="pCredito">Precio Crédito (Q)</label>
+          <input id="pCredito" type="number" min="0" step="0.01" />
+        </div>
+        <div class="field-group">
+          <label for="pMinimo">Mínimo Gerencia (Q)</label>
+          <input id="pMinimo" type="number" min="0" step="0.01" />
+        </div>
+        <div class="field-group full">
+          <p id="priceError" class="error-text hidden"></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnSavePrice" type="button" class="btn btn-primary">Guardar Precios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Facturar (Exclusivo Facturación) -->
+  <div id="invoiceModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Registrar Factura</h3>
+        <button id="btnCloseInvoiceModal" class="icon-btn" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="invoiceModalSubtitle" class="muted"></p>
+        <div class="field-group">
+          <label for="invNumeroFactura">Número de Factura (sistema externo)</label>
+          <input id="invNumeroFactura" type="text" placeholder="Ej. 14425" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnConfirmInvoice" type="button" class="btn btn-success">Confirmar Facturado</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
