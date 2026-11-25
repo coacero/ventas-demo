@@ -223,15 +223,15 @@ input[type="search"], input[type="text"], input[type="email"], input[type="numbe
 .doc-actions-bar { display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center; }
 .doc-actions-bar .btn,
 .mobile-card-actions .btn {
-  background: #ffffff;
+  background: #e2e8f0;
   color: #1e293b;
-  border: 1px solid #475569;
+  border: 1px solid #94a3b8;
   font-weight: 600;
 }
 .doc-actions-bar .btn:hover,
 .mobile-card-actions .btn:hover {
-  background: #e2e8f0;
-  border-color: #1e293b;
+  background: #cbd5e1;
+  border-color: #64748b;
 }
 
 .badge {
