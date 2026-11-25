@@ -1,4 +1,4 @@
-const CACHE_NAME = "coacero-ventas-shell-v0.11";
+const CACHE_NAME = "coacero-ventas-shell-v0.11a";
 const APP_SHELL = [
   "./",
   "./index.html",
