@@ -722,10 +722,15 @@ function renderReportView() {
   const cFilter = state.report.clientSearch.trim().toLowerCase();
   const shownClients = cFilter ? allClients.filter((c) => c.toLowerCase().includes(cFilter)) : allClients;
 
-  $("repClientsSummary").textContent =
+  const summaryLabel =
     state.report.selectedClients.length === 0
       ? "Todos"
-      : `${state.report.selectedClients.length} seleccionado(s)`;
+      : state.report.selectedClients.length === 1
+        ? state.report.selectedClients[0]
+        : `${state.report.selectedClients.length} seleccionados`;
+  $("repClientsSummary").textContent =
+    state.report.selectedClients.length === 0 ? "Todos" : `${state.report.selectedClients.length} seleccionado(s)`;
+  if ($("repClientsBtnText")) $("repClientsBtnText").textContent = summaryLabel;
 
   $("repClientChecklist").innerHTML = shownClients
     .map((c) => {
@@ -2010,6 +2015,22 @@ function bindEvents() {
     state.report.mode = "shortages";
     renderReportView();
   };
+  $("btnRepClientsToggle").onclick = (e) => {
+    e.stopPropagation();
+    const menu = $("repClientsMenu");
+    const willOpen = menu.classList.contains("hidden");
+    menu.classList.toggle("hidden", !willOpen);
+    $("btnRepClientsToggle").setAttribute("aria-expanded", String(willOpen));
+    if (willOpen) $("repClientSearch").focus();
+  };
+  document.addEventListener("click", (e) => {
+    const wrap = $("repClientsDropdownWrap");
+    const menu = $("repClientsMenu");
+    if (wrap && menu && !menu.classList.contains("hidden") && !wrap.contains(e.target)) {
+      menu.classList.add("hidden");
+      $("btnRepClientsToggle").setAttribute("aria-expanded", "false");
+    }
+  });
   $("btnCloseToOcModal").onclick = () => $("toOcModal").classList.add("hidden");
   $("btnConfirmToOc").onclick = confirmToOc;
   $("btnClosePriceModal").onclick = () => $("priceModal").classList.add("hidden");

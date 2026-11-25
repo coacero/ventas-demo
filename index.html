@@ -109,9 +109,13 @@
               <label for="repTo">Hasta</label>
               <input id="repTo" type="date" />
             </div>
-            <div class="field-group field-clients">
-              <label>Clientes (<span id="repClientsSummary">Todos</span>)</label>
-              <div class="client-multiselect">
+            <div class="field-group field-clients" id="repClientsDropdownWrap">
+              <label for="btnRepClientsToggle">Clientes (<span id="repClientsSummary">Todos</span>)</label>
+              <button id="btnRepClientsToggle" type="button" class="client-dd-trigger" aria-expanded="false">
+                <span id="repClientsBtnText">Todos</span>
+                <span aria-hidden="true">▾</span>
+              </button>
+              <div id="repClientsMenu" class="client-multiselect client-dd-menu hidden">
                 <input id="repClientSearch" type="search" placeholder="Filtrar lista de clientes..." />
                 <div class="client-ms-actions">
                   <button id="btnRepSelectAll" type="button" class="link-btn">Todos</button>
