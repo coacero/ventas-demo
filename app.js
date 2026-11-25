@@ -1921,7 +1921,18 @@ function bindEvents() {
   $("repFrom").onchange = (e) => { state.report.fromDate = e.target.value; renderReportView(); };
   $("repTo").onchange = (e) => { state.report.toDate = e.target.value; renderReportView(); };
   $("repClientSearch").oninput = (e) => { state.report.clientSearch = e.target.value; renderReportView(); };
-  $("btnRepSelectAll").onclick = () => { state.report.selectedClients = []; renderReportView(); };
+  $("btnRepSelectAll").onclick = () => {
+    const allClients = Array.from(
+      new Set(
+        visibleDocsForUser()
+          .filter((d) => d.Estado === DOC_STATES.FACTURADO)
+          .map((d) => d.ClienteNombre)
+          .filter(Boolean)
+      )
+    );
+    state.report.selectedClients = allClients;
+    renderReportView();
+  };
   $("btnRepClearClients").onclick = () => { state.report.selectedClients = []; renderReportView(); };
   $("clientSearch").oninput = renderClientsView;
   $("catalogSearch").oninput = renderCatalogView;
