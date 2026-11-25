@@ -1,14 +1,18 @@
 import { APP_CONFIG } from "./config.js";
 import { GraphClient } from "./graph-client.mjs";
 import {
+  CLOSE_CONDITIONS,
   DOC_STATES,
+  ORIGIN_REASONS,
   ROLES,
+  buildPartialInvoicePlan,
   canAddProductLine,
   computeElapsedDays,
   computeLineMetrics,
   filterSalesReportDocs,
   getRoleCapabilities,
   mapDispatchDeliveryStatus,
+  nextOrderCode,
   resolveCommercialRole,
   syncPaymentTerms,
   validateDiscardReason,
@@ -31,10 +35,55 @@ const DEMO_DATA = {
   documentos: [
     { id: "101", Title: "CO-0143", CorrelativoBase: 143, Estado: "Borrador", ClienteNombre: "ACEROS DEL NORTE, S.A.", VendedorNombre: "Juan Pablo", VendedorEmail: "juanpablo@coacero.com.gt", FormaPago: "Contado", DiasCredito: 0, TotalDocumento: 11200, TotalQuintales: 95.5, AlertaPrecioMinimo: false, Created: "2026-11-23T14:00:00Z" },
     { id: "102", Title: "CO-0142", CorrelativoBase: 142, Estado: "Presentada", ClienteNombre: "CONSTRUCTORA DEL SUR, S.A.", VendedorNombre: "Juan Pablo", VendedorEmail: "juanpablo@coacero.com.gt", FormaPago: "Credito", DiasCredito: 30, TotalDocumento: 24800, TotalQuintales: 210.0, AlertaPrecioMinimo: false, FechaVencimiento: "2026-11-28", Created: "2026-11-22T10:30:00Z" },
-    { id: "103", Title: "OC-0089", CorrelativoBase: 139, Estado: "Facturar", ClienteNombre: "INGENIERIA CENTRAL", VendedorNombre: "Sergio", VendedorEmail: "sergio@coacero.com.gt", FormaPago: "Contado", DiasCredito: 0, TotalDocumento: 18950, TotalQuintales: 162.4, AlertaPrecioMinimo: true, FechaConversionOC: "2026-11-23T16:15:00Z", Created: "2026-11-20T09:00:00Z" },
-    { id: "104", Title: "DE-0085", CorrelativoBase: 135, NumeroFactura: "14412", Estado: "Facturado", EstadoDespacho: "Enviado", ClienteNombre: "ACEROS DEL NORTE, S.A.", VendedorNombre: "Julio", VendedorEmail: "julio@coacero.com.gt", FormaPago: "Credito", DiasCredito: 30, FechaFacturacion: "2026-11-06T11:00:00Z", TotalDocumento: 32400, TotalQuintales: 280.0, AlertaPrecioMinimo: false, Pagada: false, UrlPdfEnvio: "" },
-    { id: "105", Title: "DE-0083", CorrelativoBase: 133, NumeroFactura: "14410", Estado: "Facturado", EstadoDespacho: "Entregado", ClienteNombre: "CONSTRUCTORA DEL SUR, S.A.", VendedorNombre: "Juan Pablo", VendedorEmail: "juanpablo@coacero.com.gt", FormaPago: "Contado", DiasCredito: 0, FechaFacturacion: "2026-11-19T15:20:00Z", TotalDocumento: 45100, TotalQuintales: 390.0, AlertaPrecioMinimo: false, Pagada: true, UrlPdfEnvio: "" },
-    { id: "106", Title: "DE-0079", CorrelativoBase: 129, NumeroFactura: "14392", Estado: "Facturado", EstadoDespacho: "Faltantes", ClienteNombre: "FERRETERIA LA ECONOMICA", VendedorNombre: "Sergio", VendedorEmail: "sergio@coacero.com.gt", FormaPago: "Credito", DiasCredito: 30, FechaFacturacion: "2026-10-20T09:40:00Z", TotalDocumento: 28600, TotalQuintales: 245.0, AlertaPrecioMinimo: true, Pagada: false, UrlPdfEnvio: "" },
+    {
+      id: "103",
+      Title: "OC-0089",
+      CorrelativoBase: 139,
+      Estado: "Facturar",
+      ClienteId: "3",
+      ClienteNombre: "INGENIERIA CENTRAL",
+      VendedorNombre: "Sergio",
+      VendedorEmail: "sergio@coacero.com.gt",
+      FormaPago: "Contado",
+      DiasCredito: 0,
+      TotalDocumento: 13800,
+      TotalQuintales: 11.49,
+      AlertaPrecioMinimo: true,
+      FechaConversionOC: "2026-11-23T16:15:00Z",
+      Created: "2026-11-20T09:00:00Z",
+      lines: [
+        { id: "103-1", ProductoId: "10", CodigoInterno: "VAR-38-6M", Title: "Varilla Corrugada 3/8 x 6m", TipoItem: "Producto", UnidadesPorAtado: 10, UnidadesPorQuintal: 36, CantidadUnidades: 200, CantidadAtados: 20, PesoQuintales: 5.56, PrecioUnitario: 34.5, SubtotalLinea: 6900 },
+        { id: "103-2", ProductoId: "11", CodigoInterno: "VAR-12-6M", Title: "Varilla Corrugada 1/2 x 6m", TipoItem: "Producto", UnidadesPorAtado: 6, UnidadesPorQuintal: 20, CantidadUnidades: 100, CantidadAtados: 16.67, PesoQuintales: 5.0, PrecioUnitario: 60.0, SubtotalLinea: 6000 },
+        { id: "103-3", ProductoId: "61", CodigoInterno: "FLETE", Title: "Servicio de Flete / Transporte", TipoItem: "Servicio", UnidadesPorAtado: 0, UnidadesPorQuintal: 0, CantidadUnidades: 1, CantidadAtados: 0, PesoQuintales: 0, PrecioUnitario: 900, SubtotalLinea: 900 },
+      ],
+    },
+    {
+      id: "107",
+      Title: "OC-0090",
+      CorrelativoBase: 144,
+      Estado: "Facturar",
+      DocumentoOrigenId: "106",
+      CodigoOCOrigen: "OC-0079",
+      MotivoOrigen: "ExistenciaInsuficiente",
+      NotaFacturacion: "Pendiente reposición de lámina C-26 en bodega",
+      ClienteId: "4",
+      ClienteNombre: "FERRETERIA LA ECONOMICA",
+      VendedorNombre: "Sergio",
+      VendedorEmail: "sergio@coacero.com.gt",
+      FormaPago: "Credito",
+      DiasCredito: 30,
+      TotalDocumento: 5600,
+      TotalQuintales: 4.17,
+      AlertaPrecioMinimo: false,
+      FechaConversionOC: "2026-11-24T10:15:00Z",
+      Created: "2026-11-24T10:15:00Z",
+      lines: [
+        { id: "107-1", ProductoId: "12", CodigoInterno: "LAM-GALV-12", Title: "Lámina Galvanizada C-26 12 pies", TipoItem: "Producto", UnidadesPorAtado: 10, UnidadesPorQuintal: 12, CantidadSolicitadaOriginal: 100, CantidadUnidades: 50, CantidadAtados: 5, PesoQuintales: 4.17, PrecioUnitario: 112.0, SubtotalLinea: 5600, MotivoOrigen: "ExistenciaInsuficiente" },
+      ],
+    },
+    { id: "104", Title: "DE-0085", CorrelativoBase: 135, NumeroFactura: "14412", Estado: "Facturado", EstadoDespacho: "Enviado", ClienteNombre: "ACEROS DEL NORTE, S.A.", VendedorNombre: "Julio", VendedorEmail: "julio@coacero.com.gt", FormaPago: "Credito", DiasCredito: 30, FechaFacturacion: "2026-11-06T11:00:00Z", TotalDocumento: 32400, TotalQuintales: 280.0, AlertaPrecioMinimo: false, Pagada: false, UrlPdfEnvio: "https://coacerogt.sharepoint.com/sites/despachos/Documentos%20compartidos/ControlDespachos/Despachos_pdf/14412.pdf" },
+    { id: "105", Title: "DE-0083", CorrelativoBase: 133, NumeroFactura: "14410", Estado: "Facturado", EstadoDespacho: "Entregado", ClienteNombre: "CONSTRUCTORA DEL SUR, S.A.", VendedorNombre: "Juan Pablo", VendedorEmail: "juanpablo@coacero.com.gt", FormaPago: "Contado", DiasCredito: 0, FechaFacturacion: "2026-11-19T15:20:00Z", TotalDocumento: 45100, TotalQuintales: 390.0, AlertaPrecioMinimo: false, Pagada: true, UrlPdfEnvio: "https://coacerogt.sharepoint.com/sites/despachos/Documentos%20compartidos/ControlDespachos/Despachos_pdf/14410.pdf" },
+    { id: "106", Title: "DE-0079", CorrelativoBase: 129, NumeroFactura: "14392", Estado: "Facturado", EstadoDespacho: "Faltantes", CondicionCierre: "ExistenciaInsuficientePendiente", NotaFacturacion: "Se facturaron 50 láminas en existencia; 50 pasaron a OC-0090", ClienteNombre: "FERRETERIA LA ECONOMICA", VendedorNombre: "Sergio", VendedorEmail: "sergio@coacero.com.gt", FormaPago: "Credito", DiasCredito: 30, FechaFacturacion: "2026-10-20T09:40:00Z", TotalDocumento: 28600, TotalQuintales: 245.0, AlertaPrecioMinimo: true, Pagada: false, UrlPdfEnvio: "" },
   ],
 };
 
@@ -53,6 +102,7 @@ const state = {
   productos: [],
   precios: [],
   report: {
+    mode: "sales",
     fromDate: "",
     toDate: "",
     selectedClients: [],
@@ -61,6 +111,8 @@ const state = {
   editingDocId: null,
   editingLines: [],
   invoicingDocId: null,
+  invoicingLines: [],
+  invoicingQtyMap: {},
 };
 
 const $ = (id) => document.getElementById(id);
@@ -194,6 +246,25 @@ function dispatchBadge(doc) {
   return info ? `<span class="badge ${info.cls}" title="Estado en Despachos">${info.label}</span>` : "";
 }
 
+function shortageBadge(doc) {
+  const badges = [];
+  if (
+    doc.Estado === DOC_STATES.FACTURADO &&
+    (doc.CondicionCierre === CLOSE_CONDITIONS.EXISTENCIA_INSUFICIENTE_CERRADA ||
+      doc.CondicionCierre === CLOSE_CONDITIONS.EXISTENCIA_INSUFICIENTE_PENDIENTE)
+  ) {
+    const title = doc.CondicionCierre === CLOSE_CONDITIONS.EXISTENCIA_INSUFICIENTE_PENDIENTE
+      ? "Facturación parcial: saldo quedó pendiente en otra OC"
+      : "Facturación parcial: saldo cerrado por falta de existencia";
+    badges.push(`<span class="badge badge-warning" title="${title}">Existencia insuficiente</span>`);
+  }
+  if (doc.MotivoOrigen === ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE) {
+    const ref = doc.CodigoOCOrigen ? `Ref: ${doc.CodigoOCOrigen}` : "Saldo existencia";
+    badges.push(`<span class="badge badge-info" title="OC generada por faltante de existencia">${ref}</span>`);
+  }
+  return badges.join(" ");
+}
+
 function elapsedBadge(doc) {
   const days = computeElapsedDays(doc.FechaFacturacion);
   if (days === null) return "—";
@@ -220,12 +291,16 @@ function renderDocumentsView() {
         { id: "PAID", label: "Pagadas" },
       ]
     : isInboxTab
-      ? [{ id: "ALL", label: "Pendientes de Facturar" }]
+      ? [
+          { id: "ALL", label: "Pendientes de Facturar" },
+          { id: "SHORTAGE_PENDING", label: "Por Existencia" },
+        ]
       : [
           { id: "ALL", label: "Todos" },
           { id: DOC_STATES.BORRADOR, label: "Borrador" },
           { id: DOC_STATES.PRESENTADA, label: "Presentada" },
           { id: DOC_STATES.FACTURAR, label: "Facturar" },
+          { id: "SHORTAGE_PENDING", label: "Saldo Existencia" },
           { id: DOC_STATES.FACTURADO, label: "Facturado" },
           { id: DOC_STATES.DESCARTADA, label: "Descartada" },
         ];
@@ -242,12 +317,15 @@ function renderDocumentsView() {
 
   if (state.stateFilter === "UNPAID") docs = docs.filter((d) => !d.Pagada);
   else if (state.stateFilter === "PAID") docs = docs.filter((d) => Boolean(d.Pagada));
+  else if (state.stateFilter === "SHORTAGE_PENDING") {
+    docs = docs.filter((d) => d.Estado === DOC_STATES.FACTURAR && d.MotivoOrigen === ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE);
+  }
   else if (state.stateFilter !== "ALL") docs = docs.filter((d) => d.Estado === state.stateFilter);
 
   const q = state.searchText.trim().toLowerCase();
   if (q) {
     docs = docs.filter((d) =>
-      [d.Title, d.NumeroFactura, d.ClienteNombre, d.VendedorNombre, d.OCCliente]
+      [d.Title, d.NumeroFactura, d.ClienteNombre, d.VendedorNombre, d.OCCliente, d.CodigoOCOrigen]
         .some((v) => String(v || "").toLowerCase().includes(q))
     );
   }
@@ -306,6 +384,13 @@ function buildDocActionButtons(d) {
   if (d.Estado === DOC_STATES.FACTURAR && state.caps.canInvoice) {
     btns.push(`<button class="btn btn-sm btn-success" data-invoice="${d.id}">Facturar</button>`);
   }
+  if (
+    d.Estado === DOC_STATES.FACTURAR &&
+    d.MotivoOrigen === ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE &&
+    (state.caps.canInvoice || state.caps.canEditOwnQuote)
+  ) {
+    btns.push(`<button class="btn btn-sm btn-danger" data-discard="${d.id}">Descartar</button>`);
+  }
   if (d.UrlPdfCotizacion && d.Estado !== DOC_STATES.FACTURADO) {
     btns.push(`<a class="btn btn-sm btn-secondary" href="${d.UrlPdfCotizacion}" target="_blank" rel="noopener">PDF</a>`);
   }
@@ -334,7 +419,7 @@ function renderDocRow(d, isCreditTab) {
         <td>${d.VendedorNombre || "—"}</td>
         <td>${fmtDate(d.FechaFacturacion)}</td>
         <td class="num">${fmtQ(d.TotalDocumento)}</td>
-        <td>${elapsedBadge(d)} ${dispatchBadge(d)}</td>
+        <td>${elapsedBadge(d)} ${dispatchBadge(d)} ${shortageBadge(d)}</td>
         <td>${renderPaidSwitch(d)}</td>
         <td>${buildDocActionButtons(d)}</td>
       </tr>`;
@@ -345,7 +430,7 @@ function renderDocRow(d, isCreditTab) {
       <td>${d.ClienteNombre || "—"}</td>
       <td>${d.VendedorNombre || "—"}</td>
       <td>${d.FormaPago || "Contado"}${d.DiasCredito ? ` (${d.DiasCredito}d)` : ""}</td>
-      <td>${stateBadge(d.Estado)} ${dispatchBadge(d)} ${d.AlertaPrecioMinimo && state.caps.canViewPricesAlert ? '<span class="badge badge-danger" title="Precio ofrecido menor al mínimo de Gerencia">Bajo mínimo</span>' : ""}</td>
+      <td>${stateBadge(d.Estado)} ${dispatchBadge(d)} ${shortageBadge(d)} ${d.AlertaPrecioMinimo && state.caps.canViewPricesAlert ? '<span class="badge badge-danger" title="Precio ofrecido menor al mínimo de Gerencia">Bajo mínimo</span>' : ""}</td>
       <td class="num">${fmtQ(d.TotalDocumento)}</td>
       <td>${buildDocActionButtons(d)}</td>
     </tr>`;
@@ -360,7 +445,7 @@ function renderDocMobileCard(d, isCreditTab) {
           <button type="button" class="doc-link-btn" data-view-doc="${d.id}">${ref}</button>
           <div class="mobile-card-meta">${d.ClienteNombre || "—"}</div>
         </div>
-        <div>${isCreditTab ? elapsedBadge(d) : stateBadge(d.Estado)} ${dispatchBadge(d)}</div>
+        <div>${isCreditTab ? elapsedBadge(d) : stateBadge(d.Estado)} ${dispatchBadge(d)} ${shortageBadge(d)}</div>
       </div>
       <div class="mobile-card-meta">
         Vendedor: ${d.VendedorNombre || "—"} · ${fmtQ(d.TotalDocumento)}
@@ -511,6 +596,8 @@ async function openDocDetailModal(docId) {
     ? lines
         .map((l) => {
           const qty = Number(l.CantidadUnidades ?? l.cantidadUnidades ?? 0);
+          const origQty = Number(l.CantidadSolicitadaOriginal ?? l.cantidadSolicitadaOriginal ?? 0);
+          const qtyLabel = origQty > qty ? `${qty} <span class="muted">(de ${origQty})</span>` : `${qty}`;
           const atados = Number(l.CantidadAtados ?? l.cantidadAtados ?? 0);
           const qq = Number(l.PesoQuintales ?? l.pesoQuintales ?? 0);
           const unitPrice = Number(l.PrecioUnitario ?? l.precioUnitario ?? 0);
@@ -518,7 +605,7 @@ async function openDocDetailModal(docId) {
           return `
             <tr>
               <td>${l.Title || l.title || "Material"}</td>
-              <td class="num">${qty}</td>
+              <td class="num">${qtyLabel}</td>
               <td class="num">${atados.toFixed(2)}</td>
               <td class="num">${qq.toFixed(2)}</td>
               <td class="num">${fmtQ(unitPrice)}</td>
@@ -536,7 +623,7 @@ async function openDocDetailModal(docId) {
           <strong style="font-size:1.05rem;">COACERO · ${code}</strong>
           <div class="muted">Emitido / Reg.: ${fmtDate(doc.FechaFacturacion || doc.FechaConversionOC || doc.Created)}</div>
         </div>
-        <div>${stateBadge(doc.Estado)} ${dispatchBadge(doc)}</div>
+        <div>${stateBadge(doc.Estado)} ${dispatchBadge(doc)} ${shortageBadge(doc)}</div>
       </div>
       <div class="doc-sheet-grid">
         <div><strong>Cliente</strong>${doc.ClienteNombre || "—"} ${doc.ClienteNIT ? `(${doc.ClienteNIT})` : ""}</div>
@@ -545,6 +632,8 @@ async function openDocDetailModal(docId) {
         <div><strong>OC Cliente</strong>${doc.OCCliente || "—"}</div>
         <div><strong>Dirección de Entrega</strong>${doc.DireccionEntrega || "—"}</div>
         <div><strong>Observaciones</strong>${doc.ObservacionesEntrega || "—"}</div>
+        ${doc.CodigoOCOrigen ? `<div><strong>OC Origen (Existencia)</strong>${doc.CodigoOCOrigen}</div>` : ""}
+        ${doc.NotaFacturacion ? `<div style="grid-column:1/-1;"><strong>Nota de Facturación</strong>${doc.NotaFacturacion}</div>` : ""}
         ${doc.MotivoDescarte ? `<div style="grid-column:1/-1;"><strong>Motivo de Descarte</strong><span style="color:var(--danger);">${doc.MotivoDescarte}</span></div>` : ""}
       </div>
       <div class="table-wrap">
@@ -613,6 +702,17 @@ async function togglePaid(docId) {
 }
 
 function renderReportView() {
+  const isShortageMode = state.report.mode === "shortages";
+  $("btnReportSalesMode").classList.toggle("active", !isShortageMode);
+  $("btnReportShortageMode").classList.toggle("active", isShortageMode);
+  $("salesReportSection").classList.toggle("hidden", isShortageMode);
+  $("shortageReportSection").classList.toggle("hidden", !isShortageMode);
+
+  if (isShortageMode) {
+    renderPendingShortageReport();
+    return;
+  }
+
   const docsPool = visibleDocsForUser().filter((d) => d.Estado === DOC_STATES.FACTURADO);
   const allClients = Array.from(new Set(docsPool.map((d) => d.ClienteNombre).filter(Boolean))).sort();
   const cFilter = state.report.clientSearch.trim().toLowerCase();
@@ -692,6 +792,130 @@ function renderReportView() {
     : `<p class="muted">Sin ventas en el período/clientes seleccionados.</p>`;
 
   $("btnExportReport").onclick = () => exportCsv(filtered, "reporte-ventas-clientes.csv");
+  bindDocActions();
+}
+
+async function renderPendingShortageReport() {
+  const pendingDocs = visibleDocsForUser().filter(
+    (d) => d.Estado === DOC_STATES.FACTURAR && d.MotivoOrigen === ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE
+  );
+
+  // En modo SharePoint real, cargar líneas faltantes bajo demanda si aún no están en memoria
+  if (!state.isDemo && state.graph) {
+    await Promise.all(
+      pendingDocs
+        .filter((d) => !d.lines || !d.lines.length)
+        .map(async (d) => {
+          try {
+            d.lines = await state.graph.fetchLineas(d.id);
+          } catch {
+            d.lines = [];
+          }
+        })
+    );
+  }
+
+  const productMap = new Map();
+  pendingDocs.forEach((doc) => {
+    (doc.lines || []).forEach((l) => {
+      const qty = Number(l.CantidadUnidades ?? 0);
+      if (qty <= 0) return;
+      const key = String(l.ProductoId || l.CodigoInterno || l.Title || "item");
+      const current = productMap.get(key) || {
+        Title: l.Title || "Material",
+        Unidades: 0,
+        Quintales: 0,
+        Monto: 0,
+        Ordenes: new Set(),
+      };
+      current.Unidades += qty;
+      current.Quintales += Number(l.PesoQuintales ?? 0);
+      current.Monto += Number(l.SubtotalLinea ?? qty * (Number(l.PrecioUnitario) || 0));
+      current.Ordenes.add(doc.Title || doc.id);
+      productMap.set(key, current);
+    });
+  });
+
+  const productRows = [...productMap.values()].sort((a, b) => b.Unidades - a.Unidades);
+  const totalPendQ = pendingDocs.reduce((s, d) => s + (Number(d.TotalDocumento) || 0), 0);
+  const totalPendUnits = productRows.reduce((s, p) => s + p.Unidades, 0);
+
+  $("shortageSummaryBar").innerHTML = `
+    <span><strong>OC pendientes:</strong> ${pendingDocs.length}</span>
+    <span><strong>Materiales distintos:</strong> ${productRows.length}</span>
+    <span><strong>Unidades pendientes:</strong> ${totalPendUnits}</span>
+    <span><strong>Monto pendiente:</strong> ${fmtQ(totalPendQ)}</span>
+  `;
+
+  $("shortageProductsBody").innerHTML = productRows.length
+    ? productRows
+        .map(
+          (p) => `
+          <tr>
+            <td>${p.Title}</td>
+            <td class="num"><strong>${p.Unidades}</strong></td>
+            <td class="num">${p.Quintales.toFixed(2)}</td>
+            <td class="num">${p.Ordenes.size}</td>
+            <td class="num">${fmtQ(p.Monto)}</td>
+          </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="5" class="muted">No hay materiales pendientes por existencia.</td></tr>`;
+
+  $("shortageDocsBody").innerHTML = pendingDocs.length
+    ? pendingDocs
+        .map(
+          (d) => `
+          <tr>
+            <td><button type="button" class="doc-link-btn" data-view-doc="${d.id}">${d.Title || d.id}</button></td>
+            <td>${d.CodigoOCOrigen || "—"}</td>
+            <td>${d.ClienteNombre || "—"}</td>
+            <td>${d.VendedorNombre || "—"}</td>
+            <td>${d.NotaFacturacion || "—"}</td>
+            <td class="num">${fmtQ(d.TotalDocumento)}</td>
+          </tr>`
+        )
+        .join("")
+    : `<tr><td colspan="6" class="muted">No hay órdenes pendientes por existencia.</td></tr>`;
+
+  $("shortageMobileCards").innerHTML = pendingDocs.length
+    ? pendingDocs
+        .map(
+          (d) => `
+          <div class="mobile-card">
+            <div class="mobile-card-top">
+              <button type="button" class="doc-link-btn" data-view-doc="${d.id}">${d.Title || d.id}</button>
+              <span class="badge badge-info">Ref: ${d.CodigoOCOrigen || "—"}</span>
+            </div>
+            <div class="mobile-card-meta">${d.ClienteNombre || "—"} · ${d.VendedorNombre || "—"} · ${fmtQ(d.TotalDocumento)}</div>
+            ${d.NotaFacturacion ? `<div class="mobile-card-meta">${d.NotaFacturacion}</div>` : ""}
+          </div>`
+        )
+        .join("")
+    : `<p class="muted">No hay órdenes pendientes por existencia.</p>`;
+
+  $("btnExportShortageReport").onclick = () => {
+    const csvRows = [
+      ["OC_Pendiente", "OC_Origen", "Cliente", "Vendedor", "Nota", "Total_Q"],
+      ...pendingDocs.map((d) => [
+        d.Title || "",
+        d.CodigoOCOrigen || "",
+        d.ClienteNombre || "",
+        d.VendedorNombre || "",
+        d.NotaFacturacion || "",
+        Number(d.TotalDocumento || 0).toFixed(2),
+      ]),
+    ];
+    const csv = "\uFEFF" + csvRows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pendientes-por-existencia.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   bindDocActions();
 }
 
@@ -791,11 +1015,24 @@ async function saveAllInlinePrices() {
 
   for (const { prod, values } of updates) {
     Object.assign(prod, values);
+    if (!state.isDemo && state.graph) {
+      if (prod.precioItemId) {
+        await state.graph.updatePrecio(prod.precioItemId, values);
+      } else {
+        const created = await state.graph.createPrecio({
+          Title: prod.Title,
+          ProductoId: Number(prod.id),
+          Moneda: "GTQ",
+          ...values,
+        });
+        prod.precioItemId = created?.id || null;
+      }
+    }
   }
 
   state.isEditingPricesInline = false;
   renderCatalogView();
-  showToast("Precios actualizados en demo");
+  showToast(state.isDemo ? "Precios actualizados en demo" : "Precios guardados en SharePoint");
 }
 
 function openPriceModal(prodId) {
@@ -1202,16 +1439,105 @@ async function confirmToOc() {
   doc.MedioAprobacion = medio;
   doc.FechaConversionOC = nowIso;
 
+  if (!state.isDemo && state.graph) {
+    await state.graph.updateDocumento(doc.id, {
+      Title: doc.Title,
+      Estado: DOC_STATES.FACTURAR,
+      OCCliente: ocCliente,
+      MedioAprobacion: medio,
+      FechaConversionOC: nowIso,
+      AccionPendiente: "ConvertirAOC",
+    });
+    await loadSharePointData();
+  }
   $("toOcModal").classList.add("hidden");
   renderAll();
   showToast(`${doc.Title} enviada a Bandeja de Facturación`);
 }
 
-function openInvoiceModal(docId) {
+function renderInvoiceModalLines() {
+  const lines = state.invoicingLines || [];
+  let totalFactQ = 0;
+  let totalPendUnits = 0;
+  let hasShortage = false;
+
+  $("invLinesBody").innerHTML = lines.length
+    ? lines
+        .map((l, idx) => {
+          const key = l.id !== undefined && l.id !== null ? String(l.id) : String(idx);
+          const orig = Math.max(0, Number(l.CantidadUnidades ?? 0));
+          const val = state.invoicingQtyMap[key] !== undefined ? Number(state.invoicingQtyMap[key]) : orig;
+          const safeVal = Number.isFinite(val) ? Math.min(orig, Math.max(0, val)) : orig;
+          const pend = Math.max(0, Number((orig - safeVal).toFixed(2)));
+          const unitPrice = Number(l.PrecioUnitario ?? 0);
+          const sub = Number((safeVal * unitPrice).toFixed(2));
+          totalFactQ += sub;
+          totalPendUnits += pend;
+          if (pend > 0) hasShortage = true;
+
+          return `
+            <tr>
+              <td>${l.Title || "Material"}</td>
+              <td class="num">${orig}</td>
+              <td class="num">
+                <input type="number" class="inv-qty-input" data-inv-qty="${key}" min="0" max="${orig}" step="any" value="${safeVal}" />
+              </td>
+              <td class="num">${pend > 0 ? `<strong style="color:var(--warning);">${pend}</strong>` : "0"}</td>
+              <td class="num">${fmtQ(sub)}</td>
+            </tr>`;
+        })
+        .join("")
+    : `<tr><td colspan="5" class="muted">Sin líneas detalladas; se facturará el total del documento.</td></tr>`;
+
+  $("invTotalsSummary").textContent = `A facturar: ${fmtQ(totalFactQ)}${hasShortage ? ` · Faltante: ${totalPendUnits} uds` : ""}`;
+  $("invShortageSection").classList.toggle("hidden", !hasShortage);
+
+  document.querySelectorAll("[data-inv-qty]").forEach((input) => {
+    input.oninput = () => {
+      const key = input.dataset.invQty;
+      const max = Number(input.max || 0);
+      const raw = Number(input.value);
+      const clamped = Number.isFinite(raw) ? Math.min(max, Math.max(0, raw)) : 0;
+      state.invoicingQtyMap[key] = clamped;
+      renderInvoiceModalLines();
+    };
+  });
+}
+
+async function openInvoiceModal(docId) {
   state.invoicingDocId = docId;
   const doc = state.documentos.find((d) => String(d.id) === String(docId));
-  $("invoiceModalSubtitle").textContent = `${doc?.Title || ""} · ${doc?.ClienteNombre || ""} · ${fmtQ(doc?.TotalDocumento)}`;
+  if (!doc) return;
+  $("invoiceModalSubtitle").textContent = `${doc.Title || ""} · ${doc.ClienteNombre || ""} · Pedido: ${fmtQ(doc.TotalDocumento)}`;
   $("invNumeroFactura").value = "";
+  $("invShortageNote").value = "";
+  const defaultRadio = document.querySelector('input[name="invRemainderAction"][value="pending"]');
+  if (defaultRadio) defaultRadio.checked = true;
+
+  let lines = doc.lines || [];
+  if (!state.isDemo && state.graph && !lines.length) {
+    try {
+      lines = await state.graph.fetchLineas(doc.id);
+      doc.lines = lines;
+    } catch {
+      lines = [];
+    }
+  }
+  if (state.isDemo && !lines.length) {
+    lines = [
+      { id: `${doc.id}-1`, ProductoId: "10", Title: "Varilla Corrugada 3/8 x 6m", TipoItem: "Producto", UnidadesPorAtado: 10, UnidadesPorQuintal: 36, CantidadUnidades: 100, PrecioUnitario: Number(doc.TotalDocumento || 0) / 100 || 1 },
+    ];
+    doc.lines = lines;
+  }
+
+  state.invoicingLines = lines;
+  state.invoicingQtyMap = {};
+  lines.forEach((l, idx) => {
+    const key = l.id !== undefined && l.id !== null ? String(l.id) : String(idx);
+    state.invoicingQtyMap[key] = Number(l.CantidadUnidades ?? 0);
+  });
+
+  renderInvoiceModalLines();
   $("invoiceModal").classList.remove("hidden");
 }
 
@@ -1224,19 +1550,158 @@ async function confirmInvoice() {
   const doc = state.documentos.find((d) => String(d.id) === String(state.invoicingDocId));
   if (!doc) return;
 
+  const remainderRadio = document.querySelector('input[name="invRemainderAction"]:checked');
+  const remainderAction = remainderRadio ? remainderRadio.value : "pending";
+  const shortageNote = $("invShortageNote").value.trim();
+
+  let plan = null;
+  if ((state.invoicingLines || []).length > 0) {
+    try {
+      plan = buildPartialInvoicePlan(doc, state.invoicingLines, state.invoicingQtyMap, {
+        remainderAction,
+        note: shortageNote,
+      });
+    } catch (err) {
+      showToast(err.message);
+      return;
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+
   if (state.isDemo || !state.graph) {
     doc.NumeroFactura = num;
     doc.Estado = DOC_STATES.FACTURADO;
-    doc.FechaFacturacion = new Date().toISOString();
+    doc.FechaFacturacion = nowIso;
     doc.Pagada = false;
-    showToast(`Factura #${num} registrada en demo`);
+
+    if (plan) {
+      doc.lines = plan.invoicedLines;
+      doc.TotalDocumento = plan.invoicedTotals.TotalDocumento;
+      doc.TotalQuintales = plan.invoicedTotals.TotalQuintales;
+      doc.TotalToneladas = plan.invoicedTotals.TotalToneladas;
+      doc.CondicionCierre = plan.condicionCierre;
+      if (plan.notaFacturacion) doc.NotaFacturacion = plan.notaFacturacion;
+
+      if (plan.backorderDoc) {
+        const nextOrder = nextOrderCode(state.documentos);
+        const childDoc = {
+          id: String(Date.now()),
+          Title: nextOrder.code,
+          CorrelativoBase: nextOrder.correlativoBase,
+          FechaConversionOC: nowIso,
+          Created: nowIso,
+          ...plan.backorderDoc,
+        };
+        state.documentos.unshift(childDoc);
+        showToast(`Factura #${num} registrada · Se creó ${childDoc.Title} pendiente por existencia`);
+      } else if (plan.hasShortage) {
+        showToast(`Factura #${num} registrada con cierre parcial (Existencia insuficiente)`);
+      } else {
+        showToast(`Factura #${num} registrada en demo`);
+      }
+    } else {
+      showToast(`Factura #${num} registrada en demo`);
+    }
   } else {
-    await state.graph.updateDocumento(doc.id, {
+    const docPatch = {
       NumeroFactura: num,
       FacturadoPor: state.account?.username || "",
-      FechaFacturacion: new Date().toISOString(),
+      FechaFacturacion: nowIso,
       AccionPendiente: "ConfirmarFacturado",
-    });
+    };
+
+    if (plan) {
+      docPatch.TotalDocumento = plan.invoicedTotals.TotalDocumento;
+      docPatch.TotalQuintales = plan.invoicedTotals.TotalQuintales;
+      docPatch.TotalToneladas = plan.invoicedTotals.TotalToneladas;
+      docPatch.CondicionCierre = plan.condicionCierre;
+      if (plan.notaFacturacion) docPatch.NotaFacturacion = plan.notaFacturacion;
+
+      // Actualizar líneas reales facturadas en CVF_Documentos_Lineas antes de confirmar factura
+      for (const line of plan.invoicedLines) {
+        if (line.id) {
+          await state.graph.updateLinea(line.id, {
+            CantidadSolicitadaOriginal: line.CantidadSolicitadaOriginal,
+            CantidadUnidades: line.CantidadUnidades,
+            CantidadAtados: line.CantidadAtados,
+            PesoQuintales: line.PesoQuintales,
+            SubtotalLinea: line.SubtotalLinea,
+          });
+        }
+      }
+
+      if (plan.backorderDoc) {
+        const nextOrder = nextOrderCode(state.documentos);
+        const createdBo = await state.graph.createDocumento({
+          Title: nextOrder.code,
+          CorrelativoBase: nextOrder.correlativoBase,
+          Estado: DOC_STATES.FACTURAR,
+          AccionPendiente: "Ninguna",
+          AlertaPrecioMinimo: Boolean(plan.backorderDoc.AlertaPrecioMinimo),
+          ClienteId: plan.backorderDoc.ClienteId,
+          ClienteNombre: plan.backorderDoc.ClienteNombre,
+          ClienteNIT: plan.backorderDoc.ClienteNIT,
+          DireccionFiscal: plan.backorderDoc.DireccionFiscal,
+          ContactoNombre: plan.backorderDoc.ContactoNombre,
+          ClienteCorreo: plan.backorderDoc.ClienteCorreo,
+          Telefono: plan.backorderDoc.Telefono,
+          Celular: plan.backorderDoc.Celular,
+          NombreProyecto: plan.backorderDoc.NombreProyecto,
+          DireccionEntrega: plan.backorderDoc.DireccionEntrega,
+          ContactoEntrega: plan.backorderDoc.ContactoEntrega,
+          CelularEntrega: plan.backorderDoc.CelularEntrega,
+          VendedorNombre: plan.backorderDoc.VendedorNombre,
+          VendedorEmail: plan.backorderDoc.VendedorEmail,
+          FormaPago: plan.backorderDoc.FormaPago,
+          DiasCredito: plan.backorderDoc.DiasCredito,
+          OrigenDespacho: plan.backorderDoc.OrigenDespacho,
+          DocsFacturacion: plan.backorderDoc.DocsFacturacion,
+          OCCliente: plan.backorderDoc.OCCliente,
+          Moneda: plan.backorderDoc.Moneda,
+          ObservacionesEntrega: plan.backorderDoc.ObservacionesEntrega,
+          TotalDocumento: plan.backorderDoc.TotalDocumento,
+          TotalQuintales: plan.backorderDoc.TotalQuintales,
+          TotalToneladas: plan.backorderDoc.TotalToneladas,
+          FechaConversionOC: nowIso,
+          DocumentoOrigenId: Number(doc.id),
+          CodigoOCOrigen: plan.backorderDoc.CodigoOCOrigen,
+          MotivoOrigen: plan.backorderDoc.MotivoOrigen,
+          NotaFacturacion: plan.backorderDoc.NotaFacturacion,
+        });
+        const boId = Number(createdBo?.id);
+        if (boId) {
+          for (let i = 0; i < plan.backorderDoc.lines.length; i += 1) {
+            const bl = plan.backorderDoc.lines[i];
+            await state.graph.createLinea({
+              Title: bl.Title,
+              DocumentoId: boId,
+              CorrelativoBase: nextOrder.correlativoBase,
+              EstadoDocumento: DOC_STATES.FACTURAR,
+              ClienteNombre: plan.backorderDoc.ClienteNombre,
+              VendedorEmail: plan.backorderDoc.VendedorEmail,
+              ProductoId: Number(bl.ProductoId) || null,
+              TipoItem: bl.TipoItem || "Producto",
+              CodigoInterno: bl.CodigoInterno || "",
+              CodigoExterno: bl.CodigoExterno || "",
+              UnidadesPorAtado: Number(bl.UnidadesPorAtado) || 0,
+              UnidadesPorQuintal: Number(bl.UnidadesPorQuintal) || 0,
+              CantidadSolicitadaOriginal: bl.CantidadSolicitadaOriginal,
+              CantidadUnidades: bl.CantidadUnidades,
+              CantidadAtados: bl.CantidadAtados,
+              PesoQuintales: bl.PesoQuintales,
+              PrecioReferencia: Number(bl.PrecioReferencia ?? bl.PrecioUnitario) || 0,
+              PrecioUnitario: Number(bl.PrecioUnitario) || 0,
+              SubtotalLinea: bl.SubtotalLinea,
+              MotivoOrigen: ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE,
+              Orden: i + 1,
+            });
+          }
+        }
+      }
+    }
+
+    await state.graph.updateDocumento(doc.id, docPatch);
     await loadSharePointData();
     showToast(`Factura #${num} enviada a Power Automate`);
   }
@@ -1293,8 +1758,8 @@ async function enterDemo(role = ROLES.GERENCIA) {
   $("demoRoleSelect").classList.remove("hidden");
   $("demoRoleSelect").value = role;
   $("btnRefresh").classList.remove("hidden");
-  $("btnAuth").textContent = "Reiniciar demo";
-  $("connectionSub").textContent = "Modo demostración (datos ficticios)";
+  $("btnAuth").textContent = "Salir demo";
+  $("connectionSub").textContent = "Modo demostración (datos locales)";
   renderAll();
 }
 
@@ -1509,6 +1974,14 @@ function bindEvents() {
 
   $("btnCloseInvoiceModal").onclick = () => $("invoiceModal").classList.add("hidden");
   $("btnConfirmInvoice").onclick = confirmInvoice;
+  $("btnReportSalesMode").onclick = () => {
+    state.report.mode = "sales";
+    renderReportView();
+  };
+  $("btnReportShortageMode").onclick = () => {
+    state.report.mode = "shortages";
+    renderReportView();
+  };
   $("btnCloseToOcModal").onclick = () => $("toOcModal").classList.add("hidden");
   $("btnConfirmToOc").onclick = confirmToOc;
   $("btnClosePriceModal").onclick = () => $("priceModal").classList.add("hidden");

@@ -45,7 +45,7 @@
       </select>
       <button id="btnNewQuote" class="btn btn-primary hidden">+ Nueva Cotización</button>
       <button id="btnRefresh" class="btn btn-ghost hidden" title="Actualizar datos">↻</button>
-      <span class="version-pill">v0.10</span>
+      <span class="version-pill">v0.11</span>
       <button id="btnAuth" class="btn btn-secondary">Iniciar sesión</button>
     </div>
   </header>
@@ -99,51 +99,98 @@
 
       <!-- Vista: Reporte por Cliente y Período -->
       <section id="viewReport" class="panel hidden">
-        <div class="report-filters">
-          <div class="field-group">
-            <label for="repFrom">Desde</label>
-            <input id="repFrom" type="date" />
-          </div>
-          <div class="field-group">
-            <label for="repTo">Hasta</label>
-            <input id="repTo" type="date" />
-          </div>
-          <div class="field-group field-clients">
-            <label>Clientes (<span id="repClientsSummary">Todos</span>)</label>
-            <div class="client-multiselect">
-              <input id="repClientSearch" type="search" placeholder="Filtrar lista de clientes..." />
-              <div class="client-ms-actions">
-                <button id="btnRepSelectAll" type="button" class="link-btn">Todos</button>
-                <button id="btnRepClearClients" type="button" class="link-btn">Limpiar</button>
+        <div class="report-mode-bar">
+          <button id="btnReportSalesMode" type="button" class="chip active">Ventas Facturadas</button>
+          <button id="btnReportShortageMode" type="button" class="chip">Pendientes por Existencia</button>
+        </div>
+
+        <div id="salesReportSection">
+          <div class="report-filters">
+            <div class="field-group">
+              <label for="repFrom">Desde</label>
+              <input id="repFrom" type="date" />
+            </div>
+            <div class="field-group">
+              <label for="repTo">Hasta</label>
+              <input id="repTo" type="date" />
+            </div>
+            <div class="field-group field-clients">
+              <label>Clientes (<span id="repClientsSummary">Todos</span>)</label>
+              <div class="client-multiselect">
+                <input id="repClientSearch" type="search" placeholder="Filtrar lista de clientes..." />
+                <div class="client-ms-actions">
+                  <button id="btnRepSelectAll" type="button" class="link-btn">Todos</button>
+                  <button id="btnRepClearClients" type="button" class="link-btn">Limpiar</button>
+                </div>
+                <div id="repClientChecklist" class="client-checklist"></div>
               </div>
-              <div id="repClientChecklist" class="client-checklist"></div>
+            </div>
+            <div class="field-group report-cta">
+              <button id="btnExportReport" class="btn btn-success">Exportar Excel (CSV)</button>
             </div>
           </div>
-          <div class="field-group report-cta">
-            <button id="btnExportReport" class="btn btn-success">Exportar Excel (CSV)</button>
+
+          <div id="reportSummaryBar" class="report-summary"></div>
+
+          <div class="table-wrap desktop-only">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Factura / Ref</th>
+                  <th>Fecha Fact.</th>
+                  <th>Cliente</th>
+                  <th>Vendedor</th>
+                  <th>Forma Pago</th>
+                  <th>Días</th>
+                  <th>Estado Pago</th>
+                  <th class="num">Total (Q)</th>
+                </tr>
+              </thead>
+              <tbody id="reportTableBody"></tbody>
+            </table>
           </div>
+          <div id="reportMobileCards" class="cards-list mobile-only"></div>
         </div>
 
-        <div id="reportSummaryBar" class="report-summary"></div>
-
-        <div class="table-wrap desktop-only">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Factura / Ref</th>
-                <th>Fecha Fact.</th>
-                <th>Cliente</th>
-                <th>Vendedor</th>
-                <th>Forma Pago</th>
-                <th>Días</th>
-                <th>Estado Pago</th>
-                <th class="num">Total (Q)</th>
-              </tr>
-            </thead>
-            <tbody id="reportTableBody"></tbody>
-          </table>
+        <div id="shortageReportSection" class="hidden">
+          <div class="report-summary" id="shortageSummaryBar"></div>
+          <div class="shortage-actions-bar">
+            <span class="muted">Resumen consolidado por producto y órdenes OC pendientes por falta de existencia.</span>
+            <button id="btnExportShortageReport" type="button" class="btn btn-success btn-sm">Exportar Pendientes (CSV)</button>
+          </div>
+          <h4 class="section-subtitle">Materiales pendientes de reposición / stock</h4>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th class="num">Unidades Pendientes</th>
+                  <th class="num">qq Pendientes</th>
+                  <th class="num">Órdenes</th>
+                  <th class="num">Monto Est. (Q)</th>
+                </tr>
+              </thead>
+              <tbody id="shortageProductsBody"></tbody>
+            </table>
+          </div>
+          <h4 class="section-subtitle">Órdenes pendientes por existencia (OC)</h4>
+          <div class="table-wrap desktop-only">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>OC Pendiente</th>
+                  <th>OC Origen</th>
+                  <th>Cliente</th>
+                  <th>Vendedor</th>
+                  <th>Nota</th>
+                  <th class="num">Total (Q)</th>
+                </tr>
+              </thead>
+              <tbody id="shortageDocsBody"></tbody>
+            </table>
+          </div>
+          <div id="shortageMobileCards" class="cards-list mobile-only"></div>
         </div>
-        <div id="reportMobileCards" class="cards-list mobile-only"></div>
       </section>
 
       <!-- Vista: Clientes -->
@@ -401,16 +448,58 @@
 
   <!-- Modal Facturar (Exclusivo Facturación) -->
   <div id="invoiceModal" class="modal-backdrop hidden">
-    <div class="modal-card">
+    <div class="modal-card modal-lg">
       <div class="modal-header">
         <h3>Registrar Factura</h3>
         <button id="btnCloseInvoiceModal" class="icon-btn" type="button">✕</button>
       </div>
       <div class="modal-body">
         <p id="invoiceModalSubtitle" class="muted"></p>
-        <div class="field-group">
+        <div class="field-group" style="margin-bottom:0.85rem;">
           <label for="invNumeroFactura">Número de Factura (sistema externo)</label>
           <input id="invNumeroFactura" type="text" placeholder="Ej. 14425" />
+        </div>
+
+        <div class="lines-section" style="margin-top:0.5rem;">
+          <div class="lines-header">
+            <h4>Cantidades a facturar por línea</h4>
+            <span id="invTotalsSummary" class="muted"></span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="invLinesTable">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th class="num">Pedida</th>
+                  <th class="num">Facturar ahora</th>
+                  <th class="num">Pendiente</th>
+                  <th class="num">Subtotal (Q)</th>
+                </tr>
+              </thead>
+              <tbody id="invLinesBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="invShortageSection" class="shortage-box hidden">
+          <strong>Faltante de existencia detectado</strong>
+          <p class="muted" style="margin:0.25rem 0 0.5rem;">
+            La factura se emitirá solo por las cantidades reales indicadas arriba (y eso pasará a Bodega). ¿Qué deseas hacer con el saldo faltante?
+          </p>
+          <div class="shortage-options">
+            <label class="shortage-option">
+              <input type="radio" name="invRemainderAction" value="pending" checked />
+              <span><strong>Dejar saldo pendiente</strong> (crea nueva OC vinculada para facturar cuando haya existencia)</span>
+            </label>
+            <label class="shortage-option">
+              <input type="radio" name="invRemainderAction" value="close" />
+              <span><strong>Cerrar saldo</strong> (el cliente no espera el resto; queda registrada como Existencia insuficiente)</span>
+            </label>
+          </div>
+          <div class="field-group" style="margin-top:0.65rem;">
+            <label for="invShortageNote">Nota de facturación / motivo (opcional)</label>
+            <input id="invShortageNote" type="text" placeholder="Ej. Stock parcial en varilla 3/8, saldo pendiente para viernes" />
+          </div>
         </div>
       </div>
       <div class="modal-footer">

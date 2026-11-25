@@ -13,6 +13,16 @@ export const DOC_STATES = Object.freeze({
   ANULADA: "Anulada",
 });
 
+export const CLOSE_CONDITIONS = Object.freeze({
+  COMPLETO: "Completo",
+  EXISTENCIA_INSUFICIENTE_CERRADA: "ExistenciaInsuficienteCerrada",
+  EXISTENCIA_INSUFICIENTE_PENDIENTE: "ExistenciaInsuficientePendiente",
+});
+
+export const ORIGIN_REASONS = Object.freeze({
+  EXISTENCIA_INSUFICIENTE: "ExistenciaInsuficiente",
+});
+
 export const ROLES = Object.freeze({
   GERENCIA: "gerencia",
   FACTURACION: "facturacion",
@@ -253,5 +263,160 @@ export function computeLineMetrics(cantidadUnidades, precioUnitario, unidadesPor
     cantidadAtados: upa > 0 ? Number((qty / upa).toFixed(2)) : 0,
     pesoQuintales: upq > 0 ? Number((qty / upq).toFixed(2)) : 0,
     subtotal: Number((qty * price).toFixed(2)),
+  };
+}
+
+/**
+ * Construye el plan atómico de facturación parcial o completa para una OC.
+ * - Mantiene 1 Factura = 1 CVF_Documentos (DE-) = 1 Despacho.
+ * - Recalcula totales reales facturados y excluye líneas TipoItem="Servicio" (ej. FLETE) del saldo pendiente.
+ */
+export function buildPartialInvoicePlan(doc, lines = [], invoicedQtyMap = {}, { remainderAction = "pending", note = "" } = {}) {
+  if (!doc) throw new Error("Documento inválido.");
+  if (!Array.isArray(lines) || lines.length === 0) {
+    throw new Error("La orden no tiene líneas registradas para facturar.");
+  }
+
+  const invoicedLines = [];
+  const pendingLines = [];
+  let hasShortage = false;
+  let totalInvoicedQty = 0;
+
+  lines.forEach((line, idx) => {
+    const key = line.id !== undefined && line.id !== null ? String(line.id) : String(idx);
+    const origQty = Math.max(0, Number(line.CantidadUnidades ?? line.cantidadUnidades ?? 0));
+    const rawTarget = invoicedQtyMap[key] !== undefined ? invoicedQtyMap[key] : origQty;
+    const invQty = Number(rawTarget);
+
+    if (!Number.isFinite(invQty) || invQty < 0) {
+      throw new Error(`Cantidad inválida para "${line.Title || "Material"}".`);
+    }
+    if (invQty > origQty) {
+      throw new Error(`No puedes facturar más de lo pedido (${origQty}) en "${line.Title || "Material"}".`);
+    }
+
+    const price = Math.max(0, Number(line.PrecioUnitario ?? line.precioUnitario ?? 0));
+    const upa = Math.max(0, Number(line.UnidadesPorAtado ?? line.unidadesPorAtado ?? 0));
+    const upq = Math.max(0, Number(line.UnidadesPorQuintal ?? line.unidadesPorQuintal ?? 0));
+    const invMetrics = computeLineMetrics(invQty, price, upa, upq);
+
+    invoicedLines.push({
+      ...line,
+      CantidadSolicitadaOriginal: origQty,
+      CantidadUnidades: invQty,
+      CantidadAtados: invMetrics.cantidadAtados,
+      PesoQuintales: invMetrics.pesoQuintales,
+      SubtotalLinea: invMetrics.subtotal,
+    });
+
+    totalInvoicedQty += invQty;
+
+    const remQty = Number((origQty - invQty).toFixed(4));
+    if (remQty > 0) {
+      hasShortage = true;
+      const tipoItem = line.TipoItem || "Producto";
+      if (tipoItem !== "Servicio") {
+        const remMetrics = computeLineMetrics(remQty, price, upa, upq);
+        pendingLines.push({
+          ...line,
+          id: undefined,
+          CantidadSolicitadaOriginal: origQty,
+          CantidadUnidades: remQty,
+          CantidadAtados: remMetrics.cantidadAtados,
+          PesoQuintales: remMetrics.pesoQuintales,
+          SubtotalLinea: remMetrics.subtotal,
+          MotivoOrigen: ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE,
+        });
+      }
+    }
+  });
+
+  if (totalInvoicedQty <= 0) {
+    throw new Error("Debes facturar al menos 1 unidad en alguna línea. Si no hay existencia de nada, deja la OC pendiente o descártala.");
+  }
+
+  const invTotalDoc = Number(invoicedLines.reduce((s, l) => s + (Number(l.SubtotalLinea) || 0), 0).toFixed(2));
+  const invTotalQq = Number(invoicedLines.reduce((s, l) => s + (Number(l.PesoQuintales) || 0), 0).toFixed(2));
+  const invTotalTn = Number((invTotalQq / 22.0462).toFixed(2));
+
+  let condicionCierre = CLOSE_CONDITIONS.COMPLETO;
+  let backorderDoc = null;
+
+  if (hasShortage) {
+    if (remainderAction === "close") {
+      condicionCierre = CLOSE_CONDITIONS.EXISTENCIA_INSUFICIENTE_CERRADA;
+    } else {
+      condicionCierre = CLOSE_CONDITIONS.EXISTENCIA_INSUFICIENTE_PENDIENTE;
+      if (pendingLines.length > 0) {
+        const boTotalDoc = Number(pendingLines.reduce((s, l) => s + (Number(l.SubtotalLinea) || 0), 0).toFixed(2));
+        const boTotalQq = Number(pendingLines.reduce((s, l) => s + (Number(l.PesoQuintales) || 0), 0).toFixed(2));
+        const boTotalTn = Number((boTotalQq / 22.0462).toFixed(2));
+
+        backorderDoc = {
+          Estado: DOC_STATES.FACTURAR,
+          ClienteId: doc.ClienteId ?? null,
+          ClienteNombre: doc.ClienteNombre || "",
+          ClienteNIT: doc.ClienteNIT || "CF",
+          DireccionFiscal: doc.DireccionFiscal || "",
+          ContactoNombre: doc.ContactoNombre || "",
+          ClienteCorreo: doc.ClienteCorreo || "",
+          Telefono: doc.Telefono || "",
+          Celular: doc.Celular || "",
+          NombreProyecto: doc.NombreProyecto || "",
+          DireccionEntrega: doc.DireccionEntrega || "",
+          ContactoEntrega: doc.ContactoEntrega || "",
+          CelularEntrega: doc.CelularEntrega || "",
+          VendedorNombre: doc.VendedorNombre || "",
+          VendedorEmail: doc.VendedorEmail || "",
+          FormaPago: doc.FormaPago || "Contado",
+          DiasCredito: doc.FormaPago === "Credito" ? Number(doc.DiasCredito) || 30 : 0,
+          OrigenDespacho: doc.OrigenDespacho || "Bodega",
+          DocsFacturacion: doc.DocsFacturacion || "",
+          OCCliente: doc.OCCliente || "",
+          Moneda: doc.Moneda || "GTQ",
+          ObservacionesEntrega: doc.ObservacionesEntrega || "",
+          AlertaPrecioMinimo: Boolean(doc.AlertaPrecioMinimo),
+          DocumentoOrigenId: doc.id,
+          CodigoOCOrigen: doc.CodigoOCOrigen || doc.Title || "",
+          MotivoOrigen: ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE,
+          NotaFacturacion: String(note || "").trim(),
+          TotalDocumento: boTotalDoc,
+          TotalQuintales: boTotalQq,
+          TotalToneladas: boTotalTn,
+          lines: pendingLines,
+        };
+      }
+    }
+  }
+
+  return {
+    hasShortage,
+    condicionCierre,
+    notaFacturacion: String(note || "").trim(),
+    invoicedLines,
+    invoicedTotals: {
+      TotalDocumento: invTotalDoc,
+      TotalQuintales: invTotalQq,
+      TotalToneladas: invTotalTn,
+    },
+    pendingLines,
+    backorderDoc,
+  };
+}
+
+/**
+ * Calcula el siguiente correlativo numérico y código OC-XXXX para demos locales.
+ */
+export function nextOrderCode(docs = []) {
+  const maxCorr = (docs || []).reduce((max, d) => {
+    const corr = Number(d.CorrelativoBase) || 0;
+    const match = String(d.Title || "").match(/(\d+)$/);
+    const num = match ? Number(match[1]) : 0;
+    return Math.max(max, corr, num);
+  }, 89);
+  const next = maxCorr + 1;
+  return {
+    correlativoBase: next,
+    code: `OC-${String(next).padStart(4, "0")}`,
   };
 }

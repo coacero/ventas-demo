@@ -115,6 +115,14 @@ export class GraphClient {
     });
   }
 
+  async updateLinea(itemId, fields) {
+    const { siteId, lists } = this.config.comercialSite;
+    return this.request(`/sites/${siteId}/lists/${lists.lineas}/items/${itemId}/fields`, {
+      method: "PATCH",
+      body: JSON.stringify(fields),
+    });
+  }
+
   async deleteLinea(itemId) {
     const { siteId, lists } = this.config.comercialSite;
     return this.request(`/sites/${siteId}/lists/${lists.lineas}/items/${itemId}`, {
