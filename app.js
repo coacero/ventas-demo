@@ -357,7 +357,7 @@ function renderDocumentsView() {
   }
 
   $("docsTableBody").innerHTML = docs.length
-    ? docs.map((d) => renderDocRow(d, isCreditTab)).join("")
+    ? docs.map((d, idx) => renderDocRow(d, isCreditTab, idx)).join("")
     : `<tr><td colspan="${isCreditTab ? 7 : 6}" class="muted">No hay registros que coincidan con el filtro.</td></tr>`;
 
   $("docsMobileCards").innerHTML = docs.length
@@ -406,19 +406,20 @@ function renderPaidSwitch(d) {
   return `<button class="switch-btn ${cls}" data-toggle-paid="${d.id}">${label}</button>`;
 }
 
-function renderDocRow(d, isCreditTab) {
+function renderDocRow(d, isCreditTab, idx = 0) {
   const ref = d.NumeroFactura ? `#${d.NumeroFactura} (${d.Title || ""})` : d.Title || `BORR-${d.id}`;
   const refBtn = `<button type="button" class="doc-link-btn" data-view-doc="${d.id}">${ref}</button>`;
   const actionsHtml = buildDocActionButtons(d);
   const hasActions = Boolean(actionsHtml);
   const cols = isCreditTab ? 7 : 6;
+  const bandCls = idx % 2 === 1 ? "doc-band-odd" : "doc-band-even";
   const actionsRow = hasActions
-    ? `<tr class="doc-actions-row"><td colspan="${cols}"><div class="doc-actions-bar">${actionsHtml}</div></td></tr>`
+    ? `<tr class="doc-actions-row ${bandCls}"><td colspan="${cols}"><div class="doc-actions-bar">${actionsHtml}</div></td></tr>`
     : "";
 
   if (isCreditTab) {
     return `
-      <tr class="${hasActions ? "doc-main-row" : ""}">
+      <tr class="${bandCls} ${hasActions ? "doc-main-row" : ""}">
         <td>${refBtn}</td>
         <td>${d.ClienteNombre || "—"}</td>
         <td>${d.VendedorNombre || "—"}</td>
@@ -429,7 +430,7 @@ function renderDocRow(d, isCreditTab) {
       </tr>${actionsRow}`;
   }
   return `
-    <tr class="${hasActions ? "doc-main-row" : ""}">
+    <tr class="${bandCls} ${hasActions ? "doc-main-row" : ""}">
       <td>${refBtn}</td>
       <td>${d.ClienteNombre || "—"}</td>
       <td>${d.VendedorNombre || "—"}</td>

@@ -215,19 +215,23 @@ input[type="search"], input[type="text"], input[type="email"], input[type="numbe
 .data-table th { color: var(--muted); font-weight: 600; background: #f8fafc; white-space: nowrap; }
 .data-table td.num, .data-table th.num { white-space: nowrap; }
 .data-table tr.doc-main-row td { border-bottom: none; padding-bottom: 0.35rem; }
-.data-table tr.doc-actions-row td { padding: 0.15rem 0.6rem 0.65rem; background: #fafcff; }
+.data-table tr.doc-actions-row td { padding: 0.15rem 0.6rem 0.65rem; border-bottom: 2px solid #cbd5e1; }
+.data-table tr.doc-band-even { background: #ffffff; }
+.data-table tr.doc-band-odd { background: #f1f5f9; }
+.data-table tr.doc-band-even:not(.doc-main-row) td,
+.data-table tr.doc-band-odd:not(.doc-main-row) td { border-bottom: 2px solid #cbd5e1; }
 .doc-actions-bar { display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center; }
 .doc-actions-bar .btn,
 .mobile-card-actions .btn {
-  background: #eff6ff;
-  color: #1d4ed8;
-  border: 1px solid #93c5fd;
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #475569;
   font-weight: 600;
 }
 .doc-actions-bar .btn:hover,
 .mobile-card-actions .btn:hover {
-  background: #dbeafe;
-  border-color: #3b82f6;
+  background: #e2e8f0;
+  border-color: #1e293b;
 }
 
 .badge {
