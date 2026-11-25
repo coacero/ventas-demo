@@ -26,6 +26,13 @@ body {
 .muted { color: var(--muted); font-size: 0.875rem; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .inline-price-input { width: 92px !important; text-align: right; padding: 0.3rem 0.45rem !important; font-size: 0.85rem !important; }
+.price-cell-btn {
+  background: none; border: 1px dashed transparent; border-radius: 6px;
+  padding: 0.2rem 0.45rem; font: inherit; color: inherit; cursor: pointer;
+}
+.price-cell-btn:hover {
+  background: #f1f5f9; border-color: #94a3b8;
+}
 
 .offline-banner {
   background: #991b1b;

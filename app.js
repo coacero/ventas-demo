@@ -972,17 +972,23 @@ function renderCatalogView() {
         <td class="num">${
           inline
             ? `<input type="number" min="0.01" step="0.01" class="inline-price-input" data-inline-std="${p.id}" value="${std}" />`
-            : fmtQ(p.PrecioReferencia)
+            : canEdit
+              ? `<button type="button" class="price-cell-btn" data-inline-focus="std:${p.id}" title="Clic para editar precio">${fmtQ(p.PrecioReferencia)}</button>`
+              : fmtQ(p.PrecioReferencia)
         }</td>
         <td class="num">${
           inline
             ? `<input type="number" min="0" step="0.01" class="inline-price-input" data-inline-cred="${p.id}" value="${cred}" />`
-            : fmtQ(p.PrecioCredito || p.PrecioReferencia)
+            : canEdit
+              ? `<button type="button" class="price-cell-btn" data-inline-focus="cred:${p.id}" title="Clic para editar precio">${fmtQ(p.PrecioCredito || p.PrecioReferencia)}</button>`
+              : fmtQ(p.PrecioCredito || p.PrecioReferencia)
         }</td>
         <td class="num">${
           inline
             ? `<input type="number" min="0" step="0.01" class="inline-price-input" data-inline-min="${p.id}" value="${min}" />`
-            : fmtQ(p.PrecioMinimoGerencia)
+            : canEdit
+              ? `<button type="button" class="price-cell-btn" data-inline-focus="min:${p.id}" title="Clic para editar precio">${fmtQ(p.PrecioMinimoGerencia)}</button>`
+              : fmtQ(p.PrecioMinimoGerencia)
         }</td>
       </tr>`;
     })
@@ -991,6 +997,18 @@ function renderCatalogView() {
   if (canEdit && !inline) {
     document.querySelectorAll("[data-edit-price]").forEach((btn) => {
       btn.onclick = () => openPriceModal(btn.dataset.editPrice);
+    });
+    document.querySelectorAll("[data-inline-focus]").forEach((btn) => {
+      btn.onclick = () => {
+        const [field, id] = btn.dataset.inlineFocus.split(":");
+        state.isEditingPricesInline = true;
+        renderCatalogView();
+        const target = document.querySelector(`[data-inline-${field}="${id}"]`);
+        if (target) {
+          target.focus();
+          target.select();
+        }
+      };
     });
   }
 }
@@ -1014,7 +1032,13 @@ async function saveAllInlinePrices() {
       showToast(`${prod.Title}: ${res.error}`);
       return;
     }
-    updates.push({ prod, values: res.values });
+    const changed =
+      Number(prod.PrecioReferencia || 0) !== res.values.PrecioReferencia ||
+      Number(prod.PrecioCredito || prod.PrecioReferencia || 0) !== res.values.PrecioCredito ||
+      Number(prod.PrecioMinimoGerencia || 0) !== res.values.PrecioMinimoGerencia;
+    if (changed) {
+      updates.push({ prod, values: res.values });
+    }
   }
 
   for (const { prod, values } of updates) {
