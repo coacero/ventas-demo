@@ -343,7 +343,6 @@ function renderDocumentsView() {
         <th class="num">Total</th>
         <th>Días Transc.</th>
         <th>Pagada</th>
-        <th>Acciones</th>
       </tr>`;
   } else {
     $("docsTableHead").innerHTML = `
@@ -354,13 +353,12 @@ function renderDocumentsView() {
         <th>Pago</th>
         <th>Estado</th>
         <th class="num">Total</th>
-        <th>Acciones</th>
       </tr>`;
   }
 
   $("docsTableBody").innerHTML = docs.length
     ? docs.map((d) => renderDocRow(d, isCreditTab)).join("")
-    : `<tr><td colspan="8" class="muted">No hay registros que coincidan con el filtro.</td></tr>`;
+    : `<tr><td colspan="${isCreditTab ? 7 : 6}" class="muted">No hay registros que coincidan con el filtro.</td></tr>`;
 
   $("docsMobileCards").innerHTML = docs.length
     ? docs.map((d) => renderDocMobileCard(d, isCreditTab)).join("")
@@ -411,9 +409,16 @@ function renderPaidSwitch(d) {
 function renderDocRow(d, isCreditTab) {
   const ref = d.NumeroFactura ? `#${d.NumeroFactura} (${d.Title || ""})` : d.Title || `BORR-${d.id}`;
   const refBtn = `<button type="button" class="doc-link-btn" data-view-doc="${d.id}">${ref}</button>`;
+  const actionsHtml = buildDocActionButtons(d);
+  const hasActions = Boolean(actionsHtml);
+  const cols = isCreditTab ? 7 : 6;
+  const actionsRow = hasActions
+    ? `<tr class="doc-actions-row"><td colspan="${cols}"><div class="doc-actions-bar">${actionsHtml}</div></td></tr>`
+    : "";
+
   if (isCreditTab) {
     return `
-      <tr>
+      <tr class="${hasActions ? "doc-main-row" : ""}">
         <td>${refBtn}</td>
         <td>${d.ClienteNombre || "—"}</td>
         <td>${d.VendedorNombre || "—"}</td>
@@ -421,19 +426,17 @@ function renderDocRow(d, isCreditTab) {
         <td class="num">${fmtQ(d.TotalDocumento)}</td>
         <td>${elapsedBadge(d)} ${dispatchBadge(d)} ${shortageBadge(d)}</td>
         <td>${renderPaidSwitch(d)}</td>
-        <td>${buildDocActionButtons(d)}</td>
-      </tr>`;
+      </tr>${actionsRow}`;
   }
   return `
-    <tr>
+    <tr class="${hasActions ? "doc-main-row" : ""}">
       <td>${refBtn}</td>
       <td>${d.ClienteNombre || "—"}</td>
       <td>${d.VendedorNombre || "—"}</td>
       <td>${d.FormaPago || "Contado"}${d.DiasCredito ? ` (${d.DiasCredito}d)` : ""}</td>
       <td>${stateBadge(d.Estado)} ${dispatchBadge(d)} ${shortageBadge(d)} ${d.AlertaPrecioMinimo && state.caps.canViewPricesAlert ? '<span class="badge badge-danger" title="Precio ofrecido menor al mínimo de Gerencia">Bajo mínimo</span>' : ""}</td>
       <td class="num">${fmtQ(d.TotalDocumento)}</td>
-      <td>${buildDocActionButtons(d)}</td>
-    </tr>`;
+    </tr>${actionsRow}`;
 }
 
 function renderDocMobileCard(d, isCreditTab) {
