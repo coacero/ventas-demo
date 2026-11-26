@@ -384,7 +384,6 @@ function buildDocActionButtons(d) {
   }
   if (
     d.Estado === DOC_STATES.FACTURAR &&
-    d.MotivoOrigen === ORIGIN_REASONS.EXISTENCIA_INSUFICIENTE &&
     (state.caps.canInvoice || state.caps.canEditOwnQuote)
   ) {
     btns.push(`<button class="btn btn-sm btn-danger" data-discard="${d.id}">Descartar</button>`);
